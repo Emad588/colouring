@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Art preview</title>
+  <style>
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    body { margin: 0; padding: 24px; background: #f3ead9; font-family: "Nunito", system-ui, sans-serif; }
+    h1, h2 { font-family: "Baloo 2", system-ui, sans-serif; }
+    .grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+    .card { background: #fff; border-radius: 16px; padding: 8px; border: 2px solid #293040; }
+    .card h3 { margin: 4px 6px 8px; font-size: 16px; }
+    .art-svg { width: 100%; height: auto; display: block; }
+    .art-svg .region { fill: #fff; stroke: #293040; stroke-width: 7; stroke-linejoin: round; stroke-linecap: round; }
+    .art-svg .bg-region { stroke: none; fill: #fff; }
+    .art-svg .ink { fill: none; stroke: #293040; stroke-width: 8; stroke-linecap: round; stroke-linejoin: round; }
+    .section-title { margin: 34px 4px 16px; }
+  </style>
+</head>
+<body>
+  <h1>Absolute Colouring art test</h1>
+  <h2 class="section-title">Uncoloured</h2>
+  <div id="raw" class="grid"></div>
+  <h2 class="section-title">Magic palettes</h2>
+  <div id="themed" class="grid"></div>
+  <script type="module">
+    import { PAGES } from './js/art.js';
+    import { THEMES } from './js/palettes.js';
+    const params = new URLSearchParams(location.search);
+    const cat = params.get('cat');
+    const mode = params.get('mode') || 'both';
+    const raw = document.querySelector('#raw');
+    const themed = document.querySelector('#themed');
+    raw.parentElement.querySelector('.section-title').hidden = mode === 'themed';
+    themed.previousElementSibling.hidden = mode === 'themed';
+    themed.previousElementSibling.textContent = 'Uncoloured';
+    raw.hidden = mode === 'themed';
+    if (mode === 'raw') themed.hidden = true;
+    const list = cat ? PAGES.filter(p => p.category === cat) : PAGES;
+    list.forEach((p, i) => {
+      const rawCard = document.createElement('div');
+      rawCard.className = 'card';
+      rawCard.innerHTML = p.art + `<h3>${p.title}</h3>`;
+      raw.appendChild(rawCard);
+      const themeCard = document.createElement('div');
+      themeCard.className = 'card';
+      themeCard.innerHTML = p.art + `<h3>${p.title}</h3>`;
+      const theme = THEMES.find(t => t.id === params.get('theme')) || THEMES[i % THEMES.length];
+      themeCard.querySelectorAll('.region').forEach(r => {
+        const tone = r.dataset.tone;
+        r.style.fill = theme.colors[tone] || '#fff';
+      });
+      themed.appendChild(themeCard);
+    });
+  </script>
+</body>
+</html>

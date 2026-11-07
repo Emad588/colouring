@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Absolute Colouring — Playful Art Studio for Kids</title>
+  <meta name="description" content="A joyful, interactive colouring game for little artists. Tap to fill, magic themes, crayons, stickers, and sound!">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎨</text></svg>">
+  <link rel="stylesheet" href="./css/style.css">
+</head>
+<body class="tool-bucket">
+
+  <!-- Top Application Header -->
+  <header class="app-header">
+    <a href="#" id="app-logo" class="logo-group" aria-label="Absolute Colouring Home">
+      <span class="logo-icon">🎨</span>
+      <span class="logo-text">Absolute Colouring</span>
+      <span class="logo-badge">Kids Studio</span>
+    </a>
+    <div class="header-actions">
+      <button id="sound-toggle-btn" class="btn btn-icon-only" aria-label="Toggle Sound" title="Sound On / Off">
+        <span id="sound-icon">🔊</span>
+      </button>
+      <button id="btn-random" class="btn btn-primary" title="Pick a random picture">
+        <span>🎲</span>
+        <span>Surprise Me!</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main View Container -->
+  <main class="view-container">
+
+    <!-- VIEW 1: PICTURE GALLERY -->
+    <section id="gallery-view">
+      <div class="gallery-hero">
+        <div class="gallery-title-box">
+          <h1>Pick a picture to colour! 🎨</h1>
+          <p>Choose from 50 wonderful pictures across 8 magical worlds.</p>
+        </div>
+      </div>
+
+      <!-- Category Filter Tabs -->
+      <nav id="category-bar" class="category-bar" aria-label="Picture Categories"></nav>
+
+      <!-- Pictures Grid -->
+      <div id="picture-grid" class="picture-grid"></div>
+    </section>
+
+    <!-- VIEW 2: COLOURING STUDIO -->
+    <section id="studio-view" style="display: none;">
+      <!-- Studio Navigation Bar -->
+      <nav class="studio-nav">
+        <button id="btn-back-gallery" class="btn btn-pink" title="Back to all pictures">
+          <span>◀</span>
+          <span>All Pictures</span>
+        </button>
+
+        <div class="studio-title-box">
+          <h2 id="studio-title" class="studio-page-title">Picture Title</h2>
+          <span id="studio-badge" class="studio-page-badge">Category</span>
+        </div>
+
+        <div class="studio-paging">
+          <button id="btn-prev-page" class="btn btn-icon-only" aria-label="Previous Picture" title="Previous Picture">◀</button>
+          <span id="page-counter" class="page-counter">1 / 26</span>
+          <button id="btn-next-page" class="btn btn-icon-only" aria-label="Next Picture" title="Next Picture">▶</button>
+        </div>
+
+        <div class="studio-nav-actions">
+          <button id="btn-save-image" class="btn btn-blue" title="Download picture">
+            <span>💾</span>
+            <span>Save</span>
+          </button>
+          <button id="btn-print-sheet" class="btn btn-purple" title="Print colouring sheet">
+            <span>🖨️</span>
+            <span>Print</span>
+          </button>
+          <button id="btn-celebrate" class="btn btn-tada" title="Celebrate finished picture!">
+            <span>🎉</span>
+            <span>Tada!</span>
+          </button>
+        </div>
+      </nav>
+
+      <!-- Main Studio Workspace -->
+      <div class="studio-workspace">
+
+        <!-- Left Tool Selector -->
+        <aside class="studio-toolbox" aria-label="Drawing Tools">
+          <button class="tool-btn active" data-tool="bucket" title="Tap to Fill colour">
+            <span class="tool-icon">🪣</span>
+            <span class="tool-label">Fill</span>
+          </button>
+
+          <button class="tool-btn" data-tool="draw" title="Freehand Crayon brush">
+            <span class="tool-icon">🖍️</span>
+            <span class="tool-label">Draw</span>
+          </button>
+
+          <button class="tool-btn" data-tool="sticker" title="Sticker Stamps">
+            <span class="tool-icon">⭐</span>
+            <span class="tool-label">Stickers</span>
+          </button>
+
+          <button class="tool-btn" data-tool="eraser" title="Eraser tool">
+            <span class="tool-icon">🧽</span>
+            <span class="tool-label">Eraser</span>
+          </button>
+
+          <div class="toolbox-divider"></div>
+
+          <button id="btn-magic-themes" class="tool-btn" title="One-Click Magic Theme">
+            <span class="tool-icon">✨</span>
+            <span class="tool-label">Magic</span>
+          </button>
+
+          <div class="toolbox-divider"></div>
+
+          <button id="btn-undo" class="tool-btn" title="Undo last step (Ctrl+Z)" disabled>
+            <span class="tool-icon">↩️</span>
+            <span class="tool-label">Undo</span>
+          </button>
+
+          <button id="btn-redo" class="tool-btn" title="Redo step (Ctrl+Y)" disabled>
+            <span class="tool-icon">↪️</span>
+            <span class="tool-label">Redo</span>
+          </button>
+
+          <button id="btn-clear-page" class="tool-btn" title="Clear and start over">
+            <span class="tool-icon">🗑️</span>
+            <span class="tool-label">Clear</span>
+          </button>
+        </aside>
+
+        <!-- Center Art Canvas Stage -->
+        <section class="studio-stage">
+          <div class="canvas-frame">
+            <div id="art-container" class="art-container"></div>
+            <canvas id="draw-canvas" class="draw-canvas" width="1000" height="760"></canvas>
+          </div>
+
+          <!-- Popover Sticker Tray -->
+          <div id="sticker-tray" class="sticker-tray"></div>
+        </section>
+
+        <!-- Right Color Palette Bar -->
+        <aside class="studio-palette-panel" aria-label="Color Palette">
+          <div class="palette-header">
+            <div class="selected-color-card">
+              <div id="active-swatch" class="active-color-swatch"></div>
+              <div class="active-color-info">
+                <span class="active-color-label">Active Colour</span>
+                <span id="active-color-name" class="active-color-name">Cherry Red</span>
+              </div>
+            </div>
+
+            <!-- Brush Size Options (Visible in Draw Mode) -->
+            <div id="brush-options" class="brush-options-bar" style="display: none;">
+              <button class="size-pill" data-size="8" title="Small Brush">
+                <span class="size-dot size-dot-sm"></span>
+              </button>
+              <button class="size-pill active" data-size="16" title="Medium Brush">
+                <span class="size-dot size-dot-md"></span>
+              </button>
+              <button class="size-pill" data-size="28" title="Big Brush">
+                <span class="size-dot size-dot-lg"></span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Palette Category Tabs -->
+          <nav class="palette-tabs">
+            <button class="palette-tab-btn active" data-tab="crayons">🖍️ Crayons</button>
+            <button class="palette-tab-btn" data-tab="watercolours">🎨 Pastel</button>
+            <button class="palette-tab-btn" data-tab="sprays">⚡ Neon</button>
+          </nav>
+
+          <!-- Swatches Grid -->
+          <div class="swatches-scroll">
+            <div id="swatches-grid" class="swatches-grid"></div>
+          </div>
+        </aside>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Magic Themes Modal -->
+  <div id="themes-modal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2><span>✨</span><span>Magic Designer Themes</span></h2>
+        <button id="btn-close-themes" class="btn btn-icon-only">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 1.1rem; color: #4A5568;">Tap any palette to instantly paint the entire picture with harmonious artist colours!</p>
+        <div id="themes-grid" class="themes-grid"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confetti Canvas -->
+  <canvas id="confetti-canvas"></canvas>
+
+  <!-- Celebration Toast Notification -->
+  <div id="celebration-toast" class="celebration-toast">🌟 Masterpiece! 🎨</div>
+
+  <!-- Main Game Module -->
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>

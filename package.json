@@ -1,0 +1,17 @@
+{
+  "name": "absolute-colouring",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A playful colouring game for little artists.",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "build": "node tools/build.mjs",
+    "test": "node tools/test.mjs",
+    "deploy": "node tools/build.mjs && wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.158.0"
+  }
+}
