@@ -1152,3 +1152,405 @@ body.tool-eraser .canvas-frame {
     width: 100% !important;
   }
 }
+
+
+/* ==========================================================================
+   STUDIO MODES, SCORE BADGE, GLOW BRUSH, BLACKBOARD & SCRATCH ART
+   ========================================================================== */
+
+/* App Mode Navigation Bar */
+.app-mode-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #F1F5F9;
+  padding: 4px;
+  border-radius: var(--border-radius-pill);
+  border: 2px solid var(--ink);
+  box-shadow: 0 2px 0 var(--ink);
+}
+
+.mode-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: var(--border-radius-pill);
+  border: 2px solid transparent;
+  background: transparent;
+  font-family: var(--font-heading);
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--ink-light);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  outline: none;
+}
+
+.mode-tab:hover {
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.mode-tab.active {
+  background: #FFFFFF;
+  color: var(--ink);
+  border-color: var(--ink);
+  box-shadow: 0 2px 0 var(--ink);
+  transform: translateY(-1px);
+}
+
+.mode-tab[data-mode="colouring"].active {
+  background: #FFF176;
+}
+.mode-tab[data-mode="whiteboard"].active {
+  background: #E0F2FE;
+}
+.mode-tab[data-mode="blackboard"].active {
+  background: #2D3748;
+  color: #FFFFFF;
+  border-color: #1A202C;
+}
+.mode-tab[data-mode="scratch"].active {
+  background: linear-gradient(135deg, #FF6B8B, #FFD166);
+  color: #FFFFFF;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+
+/* Header Art Points Score Badge */
+.score-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: linear-gradient(135deg, #FFF9C4 0%, #FFE082 100%);
+  border: 2.5px solid var(--ink);
+  border-radius: var(--border-radius-pill);
+  box-shadow: var(--shadow-chunky-sm);
+  cursor: default;
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.score-badge.bump {
+  animation: score-bounce 0.4s ease;
+}
+
+@keyframes score-bounce {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.22) rotate(-3deg); }
+  100% { transform: scale(1); }
+}
+
+.score-star-icon {
+  font-size: 1.25rem;
+  line-height: 1;
+  animation: gentle-wobble 3s infinite ease-in-out;
+}
+
+.score-points {
+  font-family: var(--font-heading);
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #92400E;
+}
+
+.score-label {
+  font-family: var(--font-heading);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #B45309;
+  text-transform: uppercase;
+}
+
+/* Colouring Completion Pill */
+.completion-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: #F8FAFC;
+  padding: 4px 12px;
+  border: 2px solid var(--ink);
+  border-radius: var(--border-radius-pill);
+  box-shadow: 0 2px 0 var(--ink);
+}
+
+.completion-bar {
+  width: 90px;
+  height: 10px;
+  background: #E2E8F0;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid var(--ink);
+}
+
+.completion-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #38BDF8, #10B981);
+  border-radius: 999px;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.completion-badge {
+  font-family: var(--font-heading);
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.completion-pill.finished .completion-bar-fill {
+  background: linear-gradient(90deg, #F59E0B, #10B981);
+}
+
+.completion-pill.finished .completion-badge {
+  color: #047857;
+}
+
+/* Scratch Art Navigation Controls */
+.scratch-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.scratch-theme-label {
+  font-family: var(--font-heading);
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.scratch-theme-select {
+  font-family: var(--font-heading);
+  font-size: 0.95rem;
+  font-weight: 700;
+  padding: 6px 12px;
+  background: #FFFFFF;
+  border: 2px solid var(--ink);
+  border-radius: var(--border-radius-sm);
+  box-shadow: 0 2px 0 var(--ink);
+  cursor: pointer;
+  outline: none;
+}
+
+.scratch-reveal-badge {
+  font-family: var(--font-heading);
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: #6366F1;
+  background: #EEF2FF;
+  padding: 4px 10px;
+  border-radius: var(--border-radius-pill);
+  border: 1.5px solid #C7D2FE;
+}
+
+/* Stage & Frame Variations for Whiteboard / Blackboard / Scratch */
+.canvas-frame.frame-whiteboard {
+  background: #FFFFFF;
+  border-color: #475569;
+  box-shadow: 0 8px 0 #334155, 0 16px 36px rgba(0, 0, 0, 0.12);
+}
+
+.canvas-frame.frame-blackboard {
+  background: #1A232A;
+  border-color: #6E4522;
+  box-shadow: 0 8px 0 #4A2E16, 0 16px 36px rgba(0, 0, 0, 0.35);
+}
+
+.canvas-frame.frame-blackboard::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 14px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.18));
+  pointer-events: none;
+}
+
+.canvas-frame.frame-scratch {
+  background: #0D0F14;
+  border-color: #2D3748;
+  box-shadow: 0 8px 0 #1A202C, 0 16px 36px rgba(0, 0, 0, 0.3);
+}
+
+/* Scratch Art Underlayer */
+.scratch-underlayer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+  overflow: hidden;
+}
+
+.scratch-underlayer svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Glow Brush Tool Styling */
+.tool-btn[data-tool="glow"].active {
+  background: #FF007F;
+  color: #FFFFFF;
+  box-shadow: 0 0 14px rgba(255, 0, 127, 0.6), var(--shadow-chunky-pressed);
+}
+.tool-btn[data-tool="glow"].active .tool-label {
+  color: #FFFFFF;
+}
+
+/* Blackboard Mode Tool Adjustments */
+body.mode-blackboard .canvas-frame {
+  background-color: #1A232A;
+}
+
+/* Rewards & Encouragement Modals */
+.modal-celebrate {
+  text-align: center;
+  border-color: #FFB703;
+  box-shadow: 0 12px 0 #D97706, 0 24px 60px rgba(0,0,0,0.25);
+  animation: reward-pop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes reward-pop {
+  0% { transform: scale(0.7); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.celebrate-stars {
+  font-size: 3rem;
+  line-height: 1;
+  margin-bottom: 8px;
+  animation: gentle-wobble 2s infinite ease-in-out;
+}
+
+.modal-celebrate h2 {
+  font-family: var(--font-heading);
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: #92400E;
+  margin-bottom: 8px;
+}
+
+.modal-celebrate p {
+  font-size: 1.15rem;
+  color: #4B5563;
+  margin-bottom: 18px;
+}
+
+.reward-points-box {
+  background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%);
+  border: 3px solid #F59E0B;
+  border-radius: var(--border-radius-md);
+  padding: 14px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 22px;
+}
+
+.reward-points-label {
+  font-family: var(--font-heading);
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: #92400E;
+  text-transform: uppercase;
+}
+
+.reward-points-value {
+  font-family: var(--font-heading);
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: #B45309;
+  text-shadow: 0 1px 0 #FFF;
+}
+
+.reward-total-label {
+  font-family: var(--font-heading);
+  font-size: 1rem;
+  font-weight: 700;
+  color: #78350F;
+}
+
+/* Encouragement Modal (When < 85% finished) */
+.modal-encourage {
+  text-align: center;
+  border-color: #38BDF8;
+  box-shadow: 0 12px 0 #0284C7, 0 24px 60px rgba(0,0,0,0.2);
+  animation: reward-pop 0.3s ease;
+}
+
+.encourage-icon {
+  font-size: 3rem;
+  line-height: 1;
+  margin-bottom: 8px;
+}
+
+.modal-encourage h2 {
+  font-family: var(--font-heading);
+  font-size: 2rem;
+  font-weight: 800;
+  color: #0369A1;
+  margin-bottom: 8px;
+}
+
+.modal-encourage p {
+  font-size: 1.15rem;
+  color: #475569;
+  line-height: 1.4;
+  margin-bottom: 16px;
+}
+
+.encourage-progress-bar {
+  width: 100%;
+  height: 16px;
+  background: #E2E8F0;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 22px;
+}
+
+.encourage-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #F59E0B, #10B981);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.modal-action-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* Responsive Styles for App Mode Navigation */
+@media (max-width: 900px) {
+  .app-header {
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 8px 14px;
+  }
+  .app-mode-nav {
+    order: 3;
+    width: 100%;
+    justify-content: center;
+  }
+  .mode-tab {
+    padding: 5px 10px;
+    font-size: 0.85rem;
+  }
+  .score-badge {
+    padding: 4px 10px;
+  }
+  .score-points {
+    font-size: 1rem;
+  }
+}

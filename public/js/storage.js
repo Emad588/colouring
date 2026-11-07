@@ -4,6 +4,92 @@
    ========================================================================== */
 
 const STORAGE_KEY_PREFIX = 'abs_colour_page_';
+const SCORE_STORAGE_KEY = 'abs_colour_score_data';
+const BOARD_STORAGE_PREFIX = 'abs_board_';
+
+export class ScoreManager {
+  static getData() {
+    try {
+      const raw = localStorage.getItem(SCORE_STORAGE_KEY);
+      if (!raw) return { points: 0, stars: 0, completed: [] };
+      return JSON.parse(raw);
+    } catch {
+      return { points: 0, stars: 0, completed: [] };
+    }
+  }
+
+  static saveData(data) {
+    try {
+      localStorage.setItem(SCORE_STORAGE_KEY, JSON.stringify(data));
+    } catch (e) {
+      console.warn('Could not save score', e);
+    }
+  }
+
+  static isPageCompleted(pageId) {
+    const data = this.getData();
+    return (data.completed || []).includes(pageId);
+  }
+
+  static completePage(pageId) {
+    const data = this.getData();
+    if (!Array.isArray(data.completed)) data.completed = [];
+    const isFirstTime = !data.completed.includes(pageId);
+    const pointsEarned = isFirstTime ? 100 : 20;
+    const starsEarned = isFirstTime ? 3 : 1;
+
+    if (isFirstTime) {
+      data.completed.push(pageId);
+    }
+    data.points = (data.points || 0) + pointsEarned;
+    data.stars = (data.stars || 0) + starsEarned;
+
+    this.saveData(data);
+    return {
+      isFirstTime,
+      pointsEarned,
+      starsEarned,
+      totalPoints: data.points,
+      totalStars: data.stars,
+      completedCount: data.completed.length,
+    };
+  }
+
+  static getPoints() {
+    return this.getData().points || 0;
+  }
+
+  static getStars() {
+    return this.getData().stars || 0;
+  }
+}
+
+export class BoardState {
+  static getBoard(type) {
+    try {
+      return localStorage.getItem(`${BOARD_STORAGE_PREFIX}${type}`);
+    } catch {
+      return null;
+    }
+  }
+
+  static saveBoard(type, dataUrl) {
+    try {
+      localStorage.setItem(`${BOARD_STORAGE_PREFIX}${type}`, dataUrl);
+    } catch (e) {
+      console.warn('Failed to save board', e);
+    }
+  }
+
+  static clearBoard(type) {
+    try {
+      localStorage.removeItem(`${BOARD_STORAGE_PREFIX}${type}`);
+    } catch (e) {
+      console.warn('Failed to clear board', e);
+    }
+  }
+}
+
 
 export class ArtState {
   static getPageData(pageId) {

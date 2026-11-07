@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Absolute Colouring — Playful Art Studio for Kids</title>
-  <meta name="description" content="A joyful, interactive colouring game for little artists. Tap to fill, magic themes, crayons, stickers, and sound!">
+  <meta name="description" content="A joyful, interactive colouring game for little artists with Whiteboard, Blackboard, Glowing Colours, and Scratch Art!">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎨</text></svg>">
   <link rel="stylesheet" href="./css/style.css">
 </head>
@@ -17,7 +17,34 @@
       <span class="logo-text">Absolute Colouring</span>
       <span class="logo-badge">Kids Studio</span>
     </a>
+
+    <!-- Creative Studio Mode Switcher Tabs -->
+    <nav class="app-mode-nav" aria-label="Studio Modes">
+      <button class="mode-tab active" data-mode="colouring" title="50 Colouring Book Pages">
+        <span class="mode-icon">🎨</span>
+        <span class="mode-text">Colouring</span>
+      </button>
+      <button class="mode-tab" data-mode="whiteboard" title="Draw on clean Whiteboard">
+        <span class="mode-icon">📋</span>
+        <span class="mode-text">Whiteboard</span>
+      </button>
+      <button class="mode-tab" data-mode="blackboard" title="Draw on classic Blackboard with Chalk">
+        <span class="mode-icon">⬛</span>
+        <span class="mode-text">Blackboard</span>
+      </button>
+      <button class="mode-tab" data-mode="scratch" title="Scratch black coating to reveal wonderful art!">
+        <span class="mode-icon">✨</span>
+        <span class="mode-text">Scratch Art</span>
+      </button>
+    </nav>
+
+    <!-- Header Actions & Points Score Badge -->
     <div class="header-actions">
+      <div class="score-badge" id="score-badge" title="Your Art Score & Stars">
+        <span class="score-star-icon">⭐</span>
+        <span class="score-points" id="score-points">0</span>
+        <span class="score-label">pts</span>
+      </div>
       <button id="sound-toggle-btn" class="btn btn-icon-only" aria-label="Toggle Sound" title="Sound On / Off">
         <span id="sound-icon">🔊</span>
       </button>
@@ -31,7 +58,7 @@
   <!-- Main View Container -->
   <main class="view-container">
 
-    <!-- VIEW 1: PICTURE GALLERY -->
+    <!-- VIEW 1: PICTURE GALLERY (Used in Colouring Mode) -->
     <section id="gallery-view">
       <div class="gallery-hero">
         <div class="gallery-title-box">
@@ -47,7 +74,7 @@
       <div id="picture-grid" class="picture-grid"></div>
     </section>
 
-    <!-- VIEW 2: COLOURING STUDIO -->
+    <!-- VIEW 2: INTERACTIVE ART STUDIO (Shared across Colouring, Whiteboard, Blackboard, Scratch) -->
     <section id="studio-view" style="display: none;">
       <!-- Studio Navigation Bar -->
       <nav class="studio-nav">
@@ -59,11 +86,36 @@
         <div class="studio-title-box">
           <h2 id="studio-title" class="studio-page-title">Picture Title</h2>
           <span id="studio-badge" class="studio-page-badge">Category</span>
+
+          <!-- Real-time Colouring Completion Pill -->
+          <div class="completion-pill" id="completion-pill" title="Colouring Progress">
+            <div class="completion-bar">
+              <div class="completion-bar-fill" id="completion-bar-fill" style="width: 0%"></div>
+            </div>
+            <span id="completion-badge" class="completion-badge">0% done</span>
+          </div>
+
+          <!-- Scratch Art Theme Picker (Shown in Scratch Mode) -->
+          <div class="scratch-controls" id="scratch-controls" style="display: none;">
+            <label for="scratch-theme-select" class="scratch-theme-label">Hidden Art:</label>
+            <select id="scratch-theme-select" class="scratch-theme-select">
+              <option value="rainbow">🌈 Rainbow Magic</option>
+              <option value="galaxy">🚀 Cosmic Galaxy</option>
+              <option value="fairytale">🏰 Fairy Tale Castle</option>
+              <option value="underwater">🐬 Ocean Wonders</option>
+              <option value="fireworks">🎆 Midnight Fireworks</option>
+            </select>
+            <button id="btn-new-scratch" class="btn btn-primary" title="Start with a fresh scratch card">
+              <span>✨</span>
+              <span>New Sheet</span>
+            </button>
+            <span id="scratch-reveal-badge" class="scratch-reveal-badge">✨ 0% revealed</span>
+          </div>
         </div>
 
-        <div class="studio-paging">
+        <div class="studio-paging" id="studio-paging">
           <button id="btn-prev-page" class="btn btn-icon-only" aria-label="Previous Picture" title="Previous Picture">◀</button>
-          <span id="page-counter" class="page-counter">1 / 26</span>
+          <span id="page-counter" class="page-counter">1 / 50</span>
           <button id="btn-next-page" class="btn btn-icon-only" aria-label="Next Picture" title="Next Picture">▶</button>
         </div>
 
@@ -76,7 +128,7 @@
             <span>🖨️</span>
             <span>Print</span>
           </button>
-          <button id="btn-celebrate" class="btn btn-tada" title="Celebrate finished picture!">
+          <button id="btn-celebrate" class="btn btn-tada" title="Check if finished and celebrate!">
             <span>🎉</span>
             <span>Tada!</span>
           </button>
@@ -88,24 +140,29 @@
 
         <!-- Left Tool Selector -->
         <aside class="studio-toolbox" aria-label="Drawing Tools">
-          <button class="tool-btn active" data-tool="bucket" title="Tap to Fill colour">
+          <button class="tool-btn active" data-tool="bucket" id="tool-btn-bucket" title="Tap to Fill colour">
             <span class="tool-icon">🪣</span>
             <span class="tool-label">Fill</span>
           </button>
 
-          <button class="tool-btn" data-tool="draw" title="Freehand Crayon brush">
-            <span class="tool-icon">🖍️</span>
-            <span class="tool-label">Draw</span>
+          <button class="tool-btn" data-tool="draw" id="tool-btn-draw" title="Freehand Crayon / Chalk brush">
+            <span class="tool-icon" id="tool-icon-draw">🖍️</span>
+            <span class="tool-label" id="tool-label-draw">Draw</span>
           </button>
 
-          <button class="tool-btn" data-tool="sticker" title="Sticker Stamps">
+          <button class="tool-btn" data-tool="glow" id="tool-btn-glow" title="Glowing Colours Neon Brush!">
+            <span class="tool-icon">💡</span>
+            <span class="tool-label">Glow</span>
+          </button>
+
+          <button class="tool-btn" data-tool="sticker" id="tool-btn-sticker" title="Sticker Stamps">
             <span class="tool-icon">⭐</span>
             <span class="tool-label">Stickers</span>
           </button>
 
-          <button class="tool-btn" data-tool="eraser" title="Eraser tool">
-            <span class="tool-icon">🧽</span>
-            <span class="tool-label">Eraser</span>
+          <button class="tool-btn" data-tool="eraser" id="tool-btn-eraser" title="Eraser tool">
+            <span class="tool-icon" id="tool-icon-eraser">🧽</span>
+            <span class="tool-label" id="tool-label-eraser">Eraser</span>
           </button>
 
           <div class="toolbox-divider"></div>
@@ -135,8 +192,12 @@
 
         <!-- Center Art Canvas Stage -->
         <section class="studio-stage">
-          <div class="canvas-frame">
+          <div class="canvas-frame" id="canvas-frame">
+            <!-- Underlayer for Scratch Art -->
+            <div id="scratch-underlayer" class="scratch-underlayer" style="display: none;"></div>
+            <!-- SVG Art for Colouring Book -->
             <div id="art-container" class="art-container"></div>
+            <!-- Drawing / Coating Canvas -->
             <canvas id="draw-canvas" class="draw-canvas" width="1000" height="760"></canvas>
           </div>
 
@@ -145,7 +206,7 @@
         </section>
 
         <!-- Right Color Palette Bar -->
-        <aside class="studio-palette-panel" aria-label="Color Palette">
+        <aside class="studio-palette-panel" id="studio-palette-panel" aria-label="Color Palette">
           <div class="palette-header">
             <div class="selected-color-card">
               <div id="active-swatch" class="active-color-swatch"></div>
@@ -155,7 +216,7 @@
               </div>
             </div>
 
-            <!-- Brush Size Options (Visible in Draw Mode) -->
+            <!-- Brush Size Options (Visible in Draw & Glow Mode) -->
             <div id="brush-options" class="brush-options-bar" style="display: none;">
               <button class="size-pill" data-size="8" title="Small Brush">
                 <span class="size-dot size-dot-sm"></span>
@@ -173,7 +234,7 @@
           <nav class="palette-tabs">
             <button class="palette-tab-btn active" data-tab="crayons">🖍️ Crayons</button>
             <button class="palette-tab-btn" data-tab="watercolours">🎨 Pastel</button>
-            <button class="palette-tab-btn" data-tab="sprays">⚡ Neon</button>
+            <button class="palette-tab-btn" data-tab="sprays">⚡ Neon Glow</button>
           </nav>
 
           <!-- Swatches Grid -->
@@ -186,6 +247,40 @@
     </section>
 
   </main>
+
+  <!-- Celebration & Rewards Modal (When >= 85% finished) -->
+  <div id="reward-modal" class="modal-overlay">
+    <div class="modal-card modal-celebrate">
+      <div class="celebrate-stars">⭐⭐⭐</div>
+      <h2 id="reward-title">🎉 Masterpiece Finished! 🌟</h2>
+      <p id="reward-desc">You coloured your picture with wonderful artistic style!</p>
+      <div class="reward-points-box">
+        <span class="reward-points-label">Art Award</span>
+        <span id="reward-points-value" class="reward-points-value">+100 Points</span>
+        <span id="reward-total-label" class="reward-total-label">Total Score: 100 pts</span>
+      </div>
+      <div class="modal-action-row">
+        <button id="btn-reward-save" class="btn btn-blue"><span>💾</span><span>Save Picture</span></button>
+        <button id="btn-reward-next" class="btn btn-primary"><span>🎨</span><span>Next Picture</span></button>
+        <button id="btn-reward-close" class="btn btn-green"><span>✨</span><span>Keep Playing</span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Encouragement Notice Modal (When < 85% finished and Tada! clicked) -->
+  <div id="encourage-modal" class="modal-overlay">
+    <div class="modal-card modal-encourage">
+      <div class="encourage-icon">🎨</div>
+      <h2>Almost There, Little Artist! 🖍️</h2>
+      <p id="encourage-desc">You've coloured <strong id="encourage-pct">0%</strong> of this picture.<br>Colour at least <strong>85%</strong> to complete your masterpiece and earn your ⭐ 100 Points!</p>
+      <div class="encourage-progress-bar">
+        <div class="encourage-progress-fill" id="encourage-progress-fill" style="width: 0%"></div>
+      </div>
+      <div class="modal-action-row">
+        <button id="btn-encourage-keep" class="btn btn-primary"><span>🖍️</span><span>Keep Colouring!</span></button>
+      </div>
+    </div>
+  </div>
 
   <!-- Magic Themes Modal -->
   <div id="themes-modal" class="modal-overlay">

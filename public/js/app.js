@@ -1,23 +1,25 @@
 /* ==========================================================================
    Absolute Colouring — Main Application Controller
-   Complete interactive coloring game with tap-to-fill, magic themes,
-   freehand crayon/sparkle drawing, sticker stamps, undo/redo, and audio.
+   Enhanced with Whiteboard, Blackboard, Glowing Colours, Scratch Art,
+   and strict Completion Cheering & Points logic.
    ========================================================================== */
 
 import { PAGES, PAGE_BY_ID, CATEGORIES } from './art.js';
 import { CRAYONS, WATERCOLOURS, SPRAYS, RAINBOW, THEMES } from './palettes.js';
 import { sound } from './audio.js';
 import { confetti } from './confetti.js';
-import { ArtState, HistoryManager } from './storage.js';
+import { ScoreManager, BoardState, ArtState, HistoryManager } from './storage.js';
+import { SCRATCH_THEMES, getScratchUnderlayerSVG } from './scratch-art.js';
 
 class ColouringApp {
   constructor() {
+    this.currentMode = 'colouring'; // 'colouring' | 'whiteboard' | 'blackboard' | 'scratch'
     this.currentView = 'gallery';
     this.currentPage = null;
     this.currentCategory = 'all';
 
     // Tool state
-    this.activeTool = 'bucket'; // 'bucket' | 'draw' | 'sticker' | 'eraser'
+    this.activeTool = 'bucket'; // 'bucket' | 'draw' | 'glow' | 'sticker' | 'eraser'
     this.brushType = 'crayon'; // 'crayon' | 'marker' | 'sparkle'
     this.brushSize = 16;
     this.activePaletteTab = 'crayons';
@@ -26,6 +28,15 @@ class ColouringApp {
     this.isRainbow = false;
     this.rainbowIndex = 0;
     this.rainbowPalette = ['#FF5F6D', '#FFC371', '#F9F871', '#6EE7B7', '#5BC0EB', '#9B7BFF', '#F472B6'];
+
+    // Scratch art state
+    this.scratchTheme = 'rainbow';
+    this.scratchRevealPct = 0;
+    this.scratchCelebrated = false;
+    this.lastRevealCheckTime = 0;
+
+    // Completion tracking
+    this.completionThreshold = 85; // Must fill >= 85% of areas to earn cheering & points
 
     // Sticker state
     this.stickers = ['⭐', '❤️', '🌸', '🌈', '👑', '🐾', '🦋', '🎈', '🍩', '🚀', '💎', '🍄', '✨', '🍦', '☀️', '🐱'];
@@ -47,6 +58,7 @@ class ColouringApp {
     this.bindDOM();
     this.setupConfetti();
     this.setupAudio();
+    this.setupScoreDisplay();
     this.setupEventListeners();
     this.renderCategoryBar();
     this.renderGalleryGrid();
@@ -59,7 +71,12 @@ class ColouringApp {
     // Check URL parameters for direct picture linking (e.g. ?pic=fox)
     const params = new URLSearchParams(window.location.search);
     const picParam = params.get('pic');
-    if (picParam && PAGE_BY_ID[picParam]) {
+    const modeParam = params.get('mode');
+
+    if (modeParam && ['colouring', 'whiteboard', 'blackboard', 'scratch'].includes(modeParam)) {
+      this.switchMode(modeParam);
+    } else if (picParam && PAGE_BY_ID[picParam]) {
+      this.switchMode('colouring');
       this.openStudio(PAGE_BY_ID[picParam]);
     } else {
       this.showGallery();
@@ -73,13 +90,29 @@ class ColouringApp {
     this.dom.pictureGrid = document.getElementById('picture-grid');
 
     // Studio DOM
+    this.dom.canvasFrame = document.getElementById('canvas-frame');
     this.dom.artContainer = document.getElementById('art-container');
+    this.dom.scratchUnderlayer = document.getElementById('scratch-underlayer');
     this.dom.drawCanvas = document.getElementById('draw-canvas');
     this.dom.studioTitle = document.getElementById('studio-title');
     this.dom.studioBadge = document.getElementById('studio-badge');
     this.dom.pageCounter = document.getElementById('page-counter');
+    this.dom.studioPaging = document.getElementById('studio-paging');
+    this.dom.btnBackGallery = document.getElementById('btn-back-gallery');
+
+    // Completion progress DOM
+    this.dom.completionPill = document.getElementById('completion-pill');
+    this.dom.completionBarFill = document.getElementById('completion-bar-fill');
+    this.dom.completionBadge = document.getElementById('completion-badge');
+
+    // Scratch controls DOM
+    this.dom.scratchControls = document.getElementById('scratch-controls');
+    this.dom.scratchThemeSelect = document.getElementById('scratch-theme-select');
+    this.dom.btnNewScratch = document.getElementById('btn-new-scratch');
+    this.dom.scratchRevealBadge = document.getElementById('scratch-reveal-badge');
 
     // Palette & Tools DOM
+    this.dom.palettePanel = document.getElementById('studio-palette-panel');
     this.dom.swatchesGrid = document.getElementById('swatches-grid');
     this.dom.activeSwatch = document.getElementById('active-swatch');
     this.dom.activeColorName = document.getElementById('active-color-name');
@@ -90,13 +123,39 @@ class ColouringApp {
     this.dom.stickerTray = document.getElementById('sticker-tray');
     this.dom.brushOptions = document.getElementById('brush-options');
 
+    // Score badge
+    this.dom.scoreBadge = document.getElementById('score-badge');
+    this.dom.scorePoints = document.getElementById('score-points');
+
+    // Modals
+    this.dom.rewardModal = document.getElementById('reward-modal');
+    this.dom.encourageModal = document.getElementById('encourage-modal');
+    this.dom.encouragePct = document.getElementById('encourage-pct');
+    this.dom.encourageProgressFill = document.getElementById('encourage-progress-fill');
+    this.dom.rewardTitle = document.getElementById('reward-title');
+    this.dom.rewardDesc = document.getElementById('reward-desc');
+    this.dom.rewardPointsValue = document.getElementById('reward-points-value');
+    this.dom.rewardTotalLabel = document.getElementById('reward-total-label');
+
     // Action buttons
     this.dom.undoBtn = document.getElementById('btn-undo');
     this.dom.redoBtn = document.getElementById('btn-redo');
 
+    // Tool buttons & labels
+    this.dom.toolBtnBucket = document.getElementById('tool-btn-bucket');
+    this.dom.toolBtnDraw = document.getElementById('tool-btn-draw');
+    this.dom.toolIconDraw = document.getElementById('tool-icon-draw');
+    this.dom.toolLabelDraw = document.getElementById('tool-label-draw');
+    this.dom.toolBtnGlow = document.getElementById('tool-btn-glow');
+    this.dom.toolBtnSticker = document.getElementById('tool-btn-sticker');
+    this.dom.toolBtnEraser = document.getElementById('tool-btn-eraser');
+    this.dom.toolIconEraser = document.getElementById('tool-icon-eraser');
+    this.dom.toolLabelEraser = document.getElementById('tool-label-eraser');
+    this.dom.btnMagicThemes = document.getElementById('btn-magic-themes');
+
     // Canvas context
     if (this.dom.drawCanvas) {
-      this.ctx = this.dom.drawCanvas.getContext('2d');
+      this.ctx = this.dom.drawCanvas.getContext('2d', { willReadFrequently: true });
     }
   }
 
@@ -117,6 +176,13 @@ class ColouringApp {
     });
   }
 
+  setupScoreDisplay() {
+    const points = ScoreManager.getPoints();
+    if (this.dom.scorePoints) {
+      this.dom.scorePoints.textContent = points;
+    }
+  }
+
   updateSoundButtonState() {
     const muted = sound.isMuted();
     this.dom.soundIcon.textContent = muted ? '🔇' : '🔊';
@@ -124,22 +190,38 @@ class ColouringApp {
   }
 
   setupEventListeners() {
-    // Logo returns to gallery
+    // Mode switcher buttons
+    document.querySelectorAll('.mode-tab').forEach((tab) => {
+      tab.addEventListener('click', () => {
+        sound.playPop();
+        const mode = tab.dataset.mode;
+        this.switchMode(mode);
+      });
+    });
+
+    // Logo returns to current mode home / gallery
     document.getElementById('app-logo').addEventListener('click', (e) => {
       e.preventDefault();
       sound.playPop();
-      this.showGallery();
+      if (this.currentMode === 'colouring') {
+        this.showGallery();
+      } else {
+        this.switchMode('colouring');
+      }
     });
 
     // Surprise Me / Random Picture
     document.getElementById('btn-random').addEventListener('click', () => {
       sound.playSparkle();
+      if (this.currentMode !== 'colouring') {
+        this.switchMode('colouring');
+      }
       const randomPage = PAGES[Math.floor(Math.random() * PAGES.length)];
       this.openStudio(randomPage);
     });
 
     // Studio Back button
-    document.getElementById('btn-back-gallery').addEventListener('click', () => {
+    this.dom.btnBackGallery.addEventListener('click', () => {
       sound.playPop();
       this.showGallery();
     });
@@ -182,8 +264,24 @@ class ColouringApp {
       });
     });
 
+    // Scratch theme selector & New Sheet button
+    if (this.dom.scratchThemeSelect) {
+      this.dom.scratchThemeSelect.addEventListener('change', (e) => {
+        sound.playPop();
+        this.scratchTheme = e.target.value;
+        this.resetScratchCard();
+      });
+    }
+
+    if (this.dom.btnNewScratch) {
+      this.dom.btnNewScratch.addEventListener('click', () => {
+        sound.playSparkle();
+        this.resetScratchCard();
+      });
+    }
+
     // Magic Themes Modal triggers
-    document.getElementById('btn-magic-themes').addEventListener('click', () => {
+    this.dom.btnMagicThemes.addEventListener('click', () => {
       sound.playPop();
       this.openMagicThemesModal();
     });
@@ -196,6 +294,41 @@ class ColouringApp {
         this.closeMagicThemesModal();
       }
     });
+
+    // Reward modal buttons
+    const btnRewardSave = document.getElementById('btn-reward-save');
+    const btnRewardNext = document.getElementById('btn-reward-next');
+    const btnRewardClose = document.getElementById('btn-reward-close');
+
+    if (btnRewardSave) {
+      btnRewardSave.addEventListener('click', () => {
+        sound.playPop();
+        this.closeRewardModal();
+        this.handleSaveImage();
+      });
+    }
+    if (btnRewardNext) {
+      btnRewardNext.addEventListener('click', () => {
+        sound.playPop();
+        this.closeRewardModal();
+        this.navigatePage(1);
+      });
+    }
+    if (btnRewardClose) {
+      btnRewardClose.addEventListener('click', () => {
+        sound.playPop();
+        this.closeRewardModal();
+      });
+    }
+
+    // Encouragement modal button
+    const btnEncourageKeep = document.getElementById('btn-encourage-keep');
+    if (btnEncourageKeep) {
+      btnEncourageKeep.addEventListener('click', () => {
+        sound.playPop();
+        this.closeEncourageModal();
+      });
+    }
 
     // Undo / Redo
     this.dom.undoBtn.addEventListener('click', () => this.handleUndo());
@@ -217,18 +350,10 @@ class ColouringApp {
       window.print();
     });
 
-    // Tada! Celebration button
+    // Tada! Celebration button (Strict completion check!)
     document.getElementById('btn-celebrate').addEventListener('click', () => {
-      this.handleCelebration();
+      this.handleTadaClick();
     });
-
-    // Custom color picker
-    const customColorInput = document.getElementById('custom-color-input');
-    if (customColorInput) {
-      customColorInput.addEventListener('input', (e) => {
-        this.selectColor(e.target.value, 'Custom Color');
-      });
-    }
 
     // Keyboard shortcuts
     window.addEventListener('keydown', (e) => {
@@ -244,6 +369,257 @@ class ColouringApp {
 
     // Setup freehand canvas listeners
     this.setupCanvasDrawing();
+  }
+
+  /* ==========================================================================
+     MODE SWITCHING: COLOURING / WHITEBOARD / BLACKBOARD / SCRATCH ART
+     ========================================================================== */
+  switchMode(mode) {
+    this.currentMode = mode;
+
+    // Update active tab in header
+    document.querySelectorAll('.mode-tab').forEach((tab) => {
+      tab.classList.toggle('active', tab.dataset.mode === mode);
+    });
+
+    // Remove any mode class from body
+    document.body.classList.remove('mode-colouring', 'mode-whiteboard', 'mode-blackboard', 'mode-scratch');
+    document.body.classList.add(`mode-${mode}`);
+
+    // Reset frame class
+    this.dom.canvasFrame.className = 'canvas-frame';
+
+    if (mode === 'colouring') {
+      this.dom.scratchUnderlayer.style.display = 'none';
+      this.dom.artContainer.style.display = 'block';
+      this.dom.scratchControls.style.display = 'none';
+      this.dom.completionPill.style.display = 'inline-flex';
+      this.dom.studioPaging.style.display = 'flex';
+      this.dom.btnBackGallery.style.display = 'inline-flex';
+      this.dom.palettePanel.style.display = 'flex';
+
+      // Restore tool buttons
+      this.dom.toolBtnBucket.style.display = 'flex';
+      this.dom.btnMagicThemes.style.display = 'flex';
+      this.dom.toolIconDraw.textContent = '🖍️';
+      this.dom.toolLabelDraw.textContent = 'Draw';
+      this.dom.toolIconEraser.textContent = '🧽';
+      this.dom.toolLabelEraser.textContent = 'Eraser';
+
+      if (this.currentPage) {
+        this.openStudio(this.currentPage);
+      } else {
+        this.showGallery();
+      }
+    } else if (mode === 'whiteboard') {
+      this.openWhiteboardStudio();
+    } else if (mode === 'blackboard') {
+      this.openBlackboardStudio();
+    } else if (mode === 'scratch') {
+      this.openScratchStudio();
+    }
+  }
+
+  openWhiteboardStudio() {
+    this.currentView = 'studio';
+    this.dom.galleryView.style.display = 'none';
+    this.dom.studioView.style.display = 'flex';
+
+    // Frame styling
+    this.dom.canvasFrame.className = 'canvas-frame frame-whiteboard';
+    this.dom.artContainer.style.display = 'none';
+    this.dom.scratchUnderlayer.style.display = 'none';
+
+    // Nav controls
+    this.dom.studioTitle.textContent = 'Shiny Whiteboard';
+    this.dom.studioBadge.textContent = '📋 Marker Studio';
+    this.dom.btnBackGallery.style.display = 'none';
+    this.dom.studioPaging.style.display = 'none';
+    this.dom.completionPill.style.display = 'none';
+    this.dom.scratchControls.style.display = 'none';
+    this.dom.palettePanel.style.display = 'flex';
+
+    // Toolbox customization
+    this.dom.toolBtnBucket.style.display = 'none';
+    this.dom.btnMagicThemes.style.display = 'none';
+    this.dom.toolIconDraw.textContent = '🖍️';
+    this.dom.toolLabelDraw.textContent = 'Marker';
+    this.dom.toolIconEraser.textContent = '🧽';
+    this.dom.toolLabelEraser.textContent = 'Eraser';
+
+    // Reset canvas & load saved board
+    this.history.reset();
+    this.resizeDrawCanvas();
+    this.clearCanvas();
+
+    const savedBoard = BoardState.getBoard('whiteboard');
+    if (savedBoard) {
+      const img = new Image();
+      img.onload = () => {
+        this.ctx.drawImage(img, 0, 0, 1000, 760);
+      };
+      img.src = savedBoard;
+    }
+
+    this.setTool('draw');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  openBlackboardStudio() {
+    this.currentView = 'studio';
+    this.dom.galleryView.style.display = 'none';
+    this.dom.studioView.style.display = 'flex';
+
+    // Frame styling
+    this.dom.canvasFrame.className = 'canvas-frame frame-blackboard';
+    this.dom.artContainer.style.display = 'none';
+    this.dom.scratchUnderlayer.style.display = 'none';
+
+    // Nav controls
+    this.dom.studioTitle.textContent = 'Classic Chalkboard';
+    this.dom.studioBadge.textContent = '⬛ Chalk Studio';
+    this.dom.btnBackGallery.style.display = 'none';
+    this.dom.studioPaging.style.display = 'none';
+    this.dom.completionPill.style.display = 'none';
+    this.dom.scratchControls.style.display = 'none';
+    this.dom.palettePanel.style.display = 'flex';
+
+    // Toolbox customization
+    this.dom.toolBtnBucket.style.display = 'none';
+    this.dom.btnMagicThemes.style.display = 'none';
+    this.dom.toolIconDraw.textContent = '🖍️';
+    this.dom.toolLabelDraw.textContent = 'Chalk';
+    this.dom.toolIconEraser.textContent = '🧽';
+    this.dom.toolLabelEraser.textContent = 'Duster';
+
+    // Reset canvas & load saved board
+    this.history.reset();
+    this.resizeDrawCanvas();
+    this.clearCanvas();
+
+    const savedBoard = BoardState.getBoard('blackboard');
+    if (savedBoard) {
+      const img = new Image();
+      img.onload = () => {
+        this.ctx.drawImage(img, 0, 0, 1000, 760);
+      };
+      img.src = savedBoard;
+    }
+
+    this.setTool('draw');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  openScratchStudio() {
+    this.currentView = 'studio';
+    this.dom.galleryView.style.display = 'none';
+    this.dom.studioView.style.display = 'flex';
+
+    // Frame styling
+    this.dom.canvasFrame.className = 'canvas-frame frame-scratch';
+    this.dom.artContainer.style.display = 'none';
+    this.dom.scratchUnderlayer.style.display = 'flex';
+
+    // Nav controls
+    this.dom.studioTitle.textContent = 'Magic Scratch Art';
+    this.dom.studioBadge.textContent = '✨ Scratch to Reveal';
+    this.dom.btnBackGallery.style.display = 'none';
+    this.dom.studioPaging.style.display = 'none';
+    this.dom.completionPill.style.display = 'none';
+    this.dom.scratchControls.style.display = 'inline-flex';
+    this.dom.palettePanel.style.display = 'none'; // Not needed when scratching
+
+    // Toolbox customization
+    this.dom.toolBtnBucket.style.display = 'none';
+    this.dom.btnMagicThemes.style.display = 'none';
+    this.dom.toolIconDraw.textContent = '✏️';
+    this.dom.toolLabelDraw.textContent = 'Stylus';
+    this.dom.toolIconEraser.textContent = '🪄';
+    this.dom.toolLabelEraser.textContent = 'Scraper';
+
+    // Initialize or reset scratch card
+    this.resetScratchCard();
+    this.setTool('draw');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  resetScratchCard() {
+    this.history.reset();
+    this.scratchCelebrated = false;
+    this.scratchRevealPct = 0;
+    this.updateScratchRevealBadge(0);
+
+    // Mount underlayer SVG
+    const underlayerSVG = getScratchUnderlayerSVG(this.scratchTheme);
+    this.dom.scratchUnderlayer.innerHTML = underlayerSVG;
+
+    // Reset draw canvas and coat with black scratch layer
+    this.resizeDrawCanvas();
+    this.coatCanvasWithBlack();
+  }
+
+  coatCanvasWithBlack() {
+    if (!this.ctx) return;
+    this.ctx.save();
+    this.ctx.globalCompositeOperation = 'source-over';
+    this.ctx.fillStyle = '#14161F';
+    this.ctx.fillRect(0, 0, 1000, 760);
+
+    // Subtle metallic scratch sheen
+    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.025)';
+    for (let i = 0; i < 400; i++) {
+      const x = Math.random() * 1000;
+      const y = Math.random() * 760;
+      this.ctx.fillRect(x, y, 2, 2);
+    }
+    this.ctx.restore();
+  }
+
+  updateScratchRevealBadge(pct) {
+    this.scratchRevealPct = pct;
+    if (this.dom.scratchRevealBadge) {
+      this.dom.scratchRevealBadge.textContent = `✨ ${pct}% revealed`;
+    }
+  }
+
+  calculateScratchReveal() {
+    if (!this.ctx || this.currentMode !== 'scratch') return;
+
+    // Sample pixels across a 32x24 grid to measure transparency
+    const stepX = 1000 / 32;
+    const stepY = 760 / 24;
+    let clearSamples = 0;
+    const totalSamples = 32 * 24;
+
+    try {
+      const imgData = this.ctx.getImageData(0, 0, 1000, 760);
+      const data = imgData.data;
+
+      for (let y = 0; y < 24; y++) {
+        for (let x = 0; x < 32; x++) {
+          const px = Math.floor(x * stepX);
+          const py = Math.floor(y * stepY);
+          const idx = (py * 1000 + px) * 4;
+          const alpha = data[idx + 3];
+          if (alpha < 60) {
+            clearSamples++;
+          }
+        }
+      }
+
+      const pct = Math.min(100, Math.round((clearSamples / totalSamples) * 100));
+      this.updateScratchRevealBadge(pct);
+
+      if (pct >= 75 && !this.scratchCelebrated) {
+        this.scratchCelebrated = true;
+        sound.playCelebration();
+        sound.playPoints();
+        confetti.burst(160);
+        this.showToast('🌟 Wonderful Scratch Art! ✨');
+      }
+    } catch {
+      // Canvas read error fallback
+    }
   }
 
   /* ==========================================================================
@@ -288,6 +664,7 @@ class ColouringApp {
 
     filtered.forEach((page) => {
       const isColored = ArtState.isPageColored(page.id);
+      const isCompleted = ScoreManager.isPageCompleted(page.id);
       const savedData = ArtState.getPageData(page.id);
 
       const card = document.createElement('div');
@@ -298,7 +675,7 @@ class ColouringApp {
       card.innerHTML = `
         <div class="card-thumb-wrap">
           ${page.art}
-          ${isColored ? '<div class="card-badge-status">⭐ Colored</div>' : ''}
+          ${isCompleted ? '<div class="card-badge-status">⭐ Finished!</div>' : isColored ? '<div class="card-badge-status">In Progress</div>' : ''}
         </div>
         <div class="card-info">
           <div class="card-title-row">
@@ -337,13 +714,34 @@ class ColouringApp {
   }
 
   /* ==========================================================================
-     STUDIO VIEW LOGIC
+     COLOURING STUDIO VIEW LOGIC
      ========================================================================== */
   openStudio(page) {
     this.currentPage = page;
     this.currentView = 'studio';
+    this.currentMode = 'colouring';
+
+    document.querySelectorAll('.mode-tab').forEach((tab) => {
+      tab.classList.toggle('active', tab.dataset.mode === 'colouring');
+    });
+
     this.dom.galleryView.style.display = 'none';
     this.dom.studioView.style.display = 'flex';
+    this.dom.canvasFrame.className = 'canvas-frame';
+    this.dom.artContainer.style.display = 'block';
+    this.dom.scratchUnderlayer.style.display = 'none';
+    this.dom.scratchControls.style.display = 'none';
+    this.dom.completionPill.style.display = 'inline-flex';
+    this.dom.studioPaging.style.display = 'flex';
+    this.dom.btnBackGallery.style.display = 'inline-flex';
+    this.dom.palettePanel.style.display = 'flex';
+
+    this.dom.toolBtnBucket.style.display = 'flex';
+    this.dom.btnMagicThemes.style.display = 'flex';
+    this.dom.toolIconDraw.textContent = '🖍️';
+    this.dom.toolLabelDraw.textContent = 'Draw';
+    this.dom.toolIconEraser.textContent = '🧽';
+    this.dom.toolLabelEraser.textContent = 'Eraser';
 
     // Update nav headers
     this.dom.studioTitle.textContent = page.title;
@@ -393,6 +791,7 @@ class ColouringApp {
 
     // Default tool
     this.setTool('bucket');
+    this.updateCompletionProgress();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -408,7 +807,7 @@ class ColouringApp {
 
   setTool(tool) {
     this.activeTool = tool;
-    document.body.className = `tool-${tool}`;
+    document.body.className = `tool-${tool} mode-${this.currentMode}`;
 
     document.querySelectorAll('.tool-btn[data-tool]').forEach((btn) => {
       btn.classList.toggle('active', btn.dataset.tool === tool);
@@ -416,7 +815,7 @@ class ColouringApp {
 
     // Show/hide brush size options
     if (this.dom.brushOptions) {
-      this.dom.brushOptions.style.display = tool === 'draw' ? 'flex' : 'none';
+      this.dom.brushOptions.style.display = (tool === 'draw' || tool === 'glow') ? 'flex' : 'none';
     }
 
     // Open/close sticker tray
@@ -461,10 +860,121 @@ class ColouringApp {
     });
 
     this.saveCurrentPageState();
+    this.updateCompletionProgress();
   }
 
   /* ==========================================================================
-     FREEHAND CANVAS DRAWING & STICKERS
+     COMPLETION TRACKING ("Only finishing colouring get cheering and points")
+     ========================================================================== */
+  calculateCompletion() {
+    if (!this.dom.artContainer || this.currentMode !== 'colouring') return { pct: 0, colored: 0, total: 0 };
+    const regions = this.dom.artContainer.querySelectorAll('.region');
+    const total = regions.length;
+    if (total === 0) return { pct: 0, colored: 0, total: 0 };
+
+    let colored = 0;
+    regions.forEach((r) => {
+      const fill = (r.style.fill || '').toLowerCase().trim();
+      if (fill && fill !== '#ffffff' && fill !== 'rgb(255, 255, 255)' && fill !== 'white') {
+        colored++;
+      }
+    });
+
+    const pct = Math.round((colored / total) * 100);
+    return { pct, colored, total };
+  }
+
+  updateCompletionProgress() {
+    if (this.currentMode !== 'colouring') return;
+    const { pct } = this.calculateCompletion();
+
+    if (this.dom.completionBarFill) {
+      this.dom.completionBarFill.style.width = `${pct}%`;
+    }
+
+    if (this.dom.completionBadge) {
+      if (pct >= this.completionThreshold) {
+        this.dom.completionBadge.textContent = `⭐ ${pct}% Done!`;
+        this.dom.completionPill.classList.add('finished');
+      } else {
+        this.dom.completionBadge.textContent = `${pct}% done`;
+        this.dom.completionPill.classList.remove('finished');
+      }
+    }
+  }
+
+  handleTadaClick() {
+    // For freehand boards (Whiteboard / Blackboard / Scratch), celebrate directly
+    if (this.currentMode !== 'colouring') {
+      sound.playCelebration();
+      confetti.burst(150);
+      this.showToast('🌟 Awesome Artwork! 🎨');
+      return;
+    }
+
+    // STRICT CHECK FOR COLOURING BOOK
+    const { pct, colored, total } = this.calculateCompletion();
+
+    if (pct < this.completionThreshold) {
+      // NOT FINISHED YET: No cheering, no confetti, no points awarded!
+      sound.playNotice();
+      this.openEncourageModal(pct);
+    } else {
+      // TRULY FINISHED: Fanfare, crystal points chime, confetti, points & stars!
+      const result = ScoreManager.completePage(this.currentPage.id);
+      this.setupScoreDisplay();
+
+      // Bump animation on score badge
+      if (this.dom.scoreBadge) {
+        this.dom.scoreBadge.classList.remove('bump');
+        void this.dom.scoreBadge.offsetWidth;
+        this.dom.scoreBadge.classList.add('bump');
+      }
+
+      sound.playCelebration();
+      setTimeout(() => sound.playPoints(), 400);
+      confetti.burst(250);
+
+      this.openRewardModal(result);
+    }
+  }
+
+  openEncourageModal(pct) {
+    if (this.dom.encouragePct) this.dom.encouragePct.textContent = `${pct}%`;
+    if (this.dom.encourageProgressFill) this.dom.encourageProgressFill.style.width = `${pct}%`;
+    if (this.dom.encourageModal) this.dom.encourageModal.classList.add('open');
+  }
+
+  closeEncourageModal() {
+    if (this.dom.encourageModal) this.dom.encourageModal.classList.remove('open');
+  }
+
+  openRewardModal(result) {
+    if (this.dom.rewardTitle) {
+      this.dom.rewardTitle.textContent = result.isFirstTime
+        ? '🎉 Masterpiece Finished! 🌟'
+        : '🌟 Beautiful Replay! 🎨';
+    }
+    if (this.dom.rewardDesc) {
+      this.dom.rewardDesc.textContent = `You completed "${this.currentPage.title}" with fantastic artist colours!`;
+    }
+    if (this.dom.rewardPointsValue) {
+      this.dom.rewardPointsValue.textContent = `+${result.pointsEarned} Points ${result.isFirstTime ? '⭐⭐⭐' : '⭐'}`;
+    }
+    if (this.dom.rewardTotalLabel) {
+      this.dom.rewardTotalLabel.textContent = `Total Score: ${result.totalPoints} pts (${result.totalStars} Stars)`;
+    }
+    if (this.dom.rewardModal) {
+      this.dom.rewardModal.classList.add('open');
+    }
+  }
+
+  closeRewardModal() {
+    if (this.dom.rewardModal) this.dom.rewardModal.classList.remove('open');
+  }
+
+  /* ==========================================================================
+     FREEHAND CANVAS DRAWING, GLOWING COLOURS & SCRATCH ART
      ========================================================================== */
   setupCanvasDrawing() {
     const canvas = this.dom.drawCanvas;
@@ -489,7 +999,8 @@ class ColouringApp {
         return;
       }
 
-      if (this.activeTool !== 'draw' && this.activeTool !== 'eraser') return;
+      const validDrawTool = this.activeTool === 'draw' || this.activeTool === 'glow' || this.activeTool === 'eraser';
+      if (!validDrawTool && this.currentMode !== 'scratch') return;
 
       this.isDrawing = true;
       const pos = getCanvasPos(e);
@@ -499,6 +1010,9 @@ class ColouringApp {
 
       // Save initial canvas state for undo
       this.canvasSnapshotBeforeStroke = this.ctx.getImageData(0, 0, 1000, 760);
+
+      // Draw initial dot
+      this.drawStroke(pos.x, pos.y);
     });
 
     canvas.addEventListener('pointermove', (e) => {
@@ -507,6 +1021,15 @@ class ColouringApp {
       this.drawStroke(pos.x, pos.y);
       this.lastX = pos.x;
       this.lastY = pos.y;
+
+      // Rate-limited scratch reveal measurement
+      if (this.currentMode === 'scratch') {
+        const now = Date.now();
+        if (now - this.lastRevealCheckTime > 300) {
+          this.lastRevealCheckTime = now;
+          this.calculateScratchReveal();
+        }
+      }
     });
 
     const stopDrawing = (e) => {
@@ -527,7 +1050,11 @@ class ColouringApp {
         after: afterStroke,
       });
 
-      this.saveCurrentPageState();
+      this.saveActiveBoardState();
+
+      if (this.currentMode === 'scratch') {
+        this.calculateScratchReveal();
+      }
     };
 
     canvas.addEventListener('pointerup', stopDrawing);
@@ -552,40 +1079,113 @@ class ColouringApp {
     this.ctx.save();
     this.ctx.lineCap = 'round';
     this.ctx.lineJoin = 'round';
-    this.ctx.lineWidth = this.brushSize;
 
-    if (this.activeTool === 'eraser') {
+    // 1. SCRATCH ART MODE (Scratching away the black coating)
+    if (this.currentMode === 'scratch') {
       this.ctx.globalCompositeOperation = 'destination-out';
+      const stylusSize = this.activeTool === 'eraser' ? 52 : (this.brushSize * 1.8);
+      this.ctx.lineWidth = stylusSize;
+
       this.ctx.beginPath();
       this.ctx.moveTo(this.lastX, this.lastY);
       this.ctx.lineTo(x, y);
       this.ctx.stroke();
-    } else {
+
+      sound.playScratch();
+      this.ctx.restore();
+      return;
+    }
+
+    // 2. ERASER TOOL
+    if (this.activeTool === 'eraser') {
+      this.ctx.globalCompositeOperation = 'destination-out';
+      this.ctx.lineWidth = this.brushSize * 1.5;
+      this.ctx.beginPath();
+      this.ctx.moveTo(this.lastX, this.lastY);
+      this.ctx.lineTo(x, y);
+      this.ctx.stroke();
+      this.ctx.restore();
+      return;
+    }
+
+    // 3. GLOW BRUSH (Neon glow aura + bright inner core)
+    if (this.activeTool === 'glow') {
+      const glowColor = this.isRainbow
+        ? this.rainbowPalette[this.rainbowIndex % this.rainbowPalette.length]
+        : this.activeColor;
+
+      sound.playGlow();
+
+      // Outer luminous glow
+      this.ctx.globalCompositeOperation = 'source-over';
+      this.ctx.shadowBlur = 24;
+      this.ctx.shadowColor = glowColor;
+      this.ctx.strokeStyle = glowColor;
+      this.ctx.lineWidth = this.brushSize;
+
+      this.ctx.beginPath();
+      this.ctx.moveTo(this.lastX, this.lastY);
+      this.ctx.lineTo(x, y);
+      this.ctx.stroke();
+
+      // Inner white/pale core for neon tube intensity
+      this.ctx.shadowBlur = 6;
+      this.ctx.shadowColor = '#FFFFFF';
+      this.ctx.strokeStyle = '#FFFFFF';
+      this.ctx.lineWidth = Math.max(3, this.brushSize * 0.35);
+
+      this.ctx.beginPath();
+      this.ctx.moveTo(this.lastX, this.lastY);
+      this.ctx.lineTo(x, y);
+      this.ctx.stroke();
+
+      this.ctx.restore();
+      return;
+    }
+
+    // 4. BLACKBOARD CHALK BRUSH
+    if (this.currentMode === 'blackboard') {
       this.ctx.globalCompositeOperation = 'source-over';
       const color = this.isRainbow
         ? this.rainbowPalette[Math.floor(Math.random() * this.rainbowPalette.length)]
         : this.activeColor;
-      this.ctx.strokeStyle = color;
 
-      // Draw smooth line
+      // Soft textured chalk stroke
+      this.ctx.strokeStyle = color;
+      this.ctx.lineWidth = this.brushSize;
+      this.ctx.shadowBlur = 4;
+      this.ctx.shadowColor = color;
+
       this.ctx.beginPath();
       this.ctx.moveTo(this.lastX, this.lastY);
       this.ctx.lineTo(x, y);
       this.ctx.stroke();
 
-      // Glitter effect
-      if (this.brushType === 'sparkle') {
-        this.ctx.fillStyle = '#FFFFFF';
-        for (let i = 0; i < 3; i++) {
-          const offsetX = (Math.random() - 0.5) * this.brushSize * 1.5;
-          const offsetY = (Math.random() - 0.5) * this.brushSize * 1.5;
-          const r = 2 + Math.random() * 3;
-          this.ctx.beginPath();
-          this.ctx.arc(x + offsetX, y + offsetY, r, 0, Math.PI * 2);
-          this.ctx.fill();
-        }
+      // Chalk dust speckles
+      this.ctx.fillStyle = color;
+      for (let i = 0; i < 2; i++) {
+        const ox = (Math.random() - 0.5) * this.brushSize * 1.2;
+        const oy = (Math.random() - 0.5) * this.brushSize * 1.2;
+        this.ctx.fillRect(x + ox, y + oy, 2, 2);
       }
+
+      this.ctx.restore();
+      return;
     }
+
+    // 5. REGULAR CRAYON / MARKER DRAWING
+    this.ctx.globalCompositeOperation = 'source-over';
+    const color = this.isRainbow
+      ? this.rainbowPalette[Math.floor(Math.random() * this.rainbowPalette.length)]
+      : this.activeColor;
+
+    this.ctx.strokeStyle = color;
+    this.ctx.lineWidth = this.brushSize;
+
+    this.ctx.beginPath();
+    this.ctx.moveTo(this.lastX, this.lastY);
+    this.ctx.lineTo(x, y);
+    this.ctx.stroke();
 
     this.ctx.restore();
   }
@@ -613,7 +1213,7 @@ class ColouringApp {
       after: afterStroke,
     });
 
-    this.saveCurrentPageState();
+    this.saveActiveBoardState();
   }
 
   drawSticker(sticker, x, y, size = 54, rot = 0) {
@@ -669,6 +1269,7 @@ class ColouringApp {
   }
 
   applyMagicTheme(theme) {
+    if (this.currentMode !== 'colouring') return;
     const regions = this.dom.artContainer.querySelectorAll('.region');
     const prevFills = {};
     const newFills = {};
@@ -691,6 +1292,7 @@ class ColouringApp {
     });
 
     this.saveCurrentPageState();
+    this.updateCompletionProgress();
   }
 
   /* ==========================================================================
@@ -753,7 +1355,7 @@ class ColouringApp {
       this.dom.activeColorName.textContent = this.activeColorName;
     }
     this.dom.activeSwatch.classList.remove('bump');
-    void this.dom.activeSwatch.offsetWidth; // Trigger reflow
+    void this.dom.activeSwatch.offsetWidth;
     this.dom.activeSwatch.classList.add('bump');
   }
 
@@ -791,6 +1393,7 @@ class ColouringApp {
     if (action.type === 'fill') {
       const region = this.dom.artContainer.querySelector(`[data-region-index="${action.index}"]`);
       if (region) region.style.fill = action.prevColor;
+      this.updateCompletionProgress();
     } else if (action.type === 'magicTheme') {
       const regions = this.dom.artContainer.querySelectorAll('.region');
       regions.forEach((region, index) => {
@@ -798,13 +1401,14 @@ class ColouringApp {
           region.style.fill = action.prevFills[index];
         }
       });
+      this.updateCompletionProgress();
     } else if (action.type === 'canvas' || action.type === 'sticker') {
       if (this.ctx && action.before) {
         this.ctx.putImageData(action.before, 0, 0);
       }
     }
 
-    this.saveCurrentPageState();
+    this.saveActiveBoardState();
   }
 
   handleRedo() {
@@ -816,6 +1420,7 @@ class ColouringApp {
     if (action.type === 'fill') {
       const region = this.dom.artContainer.querySelector(`[data-region-index="${action.index}"]`);
       if (region) region.style.fill = action.newColor;
+      this.updateCompletionProgress();
     } else if (action.type === 'magicTheme') {
       const regions = this.dom.artContainer.querySelectorAll('.region');
       regions.forEach((region, index) => {
@@ -823,41 +1428,64 @@ class ColouringApp {
           region.style.fill = action.newFills[index];
         }
       });
+      this.updateCompletionProgress();
     } else if (action.type === 'canvas' || action.type === 'sticker') {
       if (this.ctx && action.after) {
         this.ctx.putImageData(action.after, 0, 0);
       }
     }
 
-    this.saveCurrentPageState();
+    this.saveActiveBoardState();
   }
 
   handleClearPage() {
     sound.playUndo();
-    const regions = this.dom.artContainer.querySelectorAll('.region');
-    const prevFills = {};
-    regions.forEach((region, index) => {
-      prevFills[index] = region.style.fill || '#FFFFFF';
-      region.style.fill = '#FFFFFF';
-    });
 
-    const beforeCanvas = this.ctx.getImageData(0, 0, 1000, 760);
-    this.clearCanvas();
+    if (this.currentMode === 'scratch') {
+      this.resetScratchCard();
+      return;
+    }
 
-    this.history.push({
-      type: 'clear',
-      prevFills,
-      beforeCanvas,
-    });
+    if (this.currentMode === 'colouring' && this.dom.artContainer) {
+      const regions = this.dom.artContainer.querySelectorAll('.region');
+      const prevFills = {};
+      regions.forEach((region, index) => {
+        prevFills[index] = region.style.fill || '#FFFFFF';
+        region.style.fill = '#FFFFFF';
+      });
 
-    this.saveCurrentPageState();
+      const beforeCanvas = this.ctx.getImageData(0, 0, 1000, 760);
+      this.clearCanvas();
+
+      this.history.push({
+        type: 'clear',
+        prevFills,
+        beforeCanvas,
+      });
+
+      this.saveCurrentPageState();
+      this.updateCompletionProgress();
+    } else {
+      // Whiteboard / Blackboard
+      this.clearCanvas();
+      BoardState.clearBoard(this.currentMode);
+    }
   }
 
   /* ==========================================================================
      SAVING & EXPORT
      ========================================================================== */
+  saveActiveBoardState() {
+    if (this.currentMode === 'colouring') {
+      this.saveCurrentPageState();
+    } else if (this.currentMode === 'whiteboard' || this.currentMode === 'blackboard') {
+      const dataUrl = this.dom.drawCanvas.toDataURL('image/png');
+      BoardState.saveBoard(this.currentMode, dataUrl);
+    }
+  }
+
   saveCurrentPageState() {
-    if (!this.currentPage) return;
+    if (!this.currentPage || this.currentMode !== 'colouring') return;
     const regions = this.dom.artContainer.querySelectorAll('.region');
     const fills = {};
     regions.forEach((region, index) => {
@@ -875,7 +1503,6 @@ class ColouringApp {
   }
 
   handleSaveImage() {
-    if (!this.currentPage) return;
     sound.playCelebration();
     confetti.burst(80);
 
@@ -884,11 +1511,65 @@ class ColouringApp {
     exportCanvas.height = 760;
     const exportCtx = exportCanvas.getContext('2d');
 
-    // Fill white background
+    const downloadFileName =
+      this.currentMode === 'colouring' && this.currentPage
+        ? `${this.currentPage.id}-by-little-artist.png`
+        : `${this.currentMode}-by-little-artist.png`;
+
+    const finishDownload = () => {
+      const link = document.createElement('a');
+      link.download = downloadFileName;
+      link.href = exportCanvas.toDataURL('image/png');
+      link.click();
+    };
+
+    if (this.currentMode === 'scratch') {
+      // For scratch: draw underlayer SVG, then draw remaining scratch canvas on top
+      const svgElement = this.dom.scratchUnderlayer.querySelector('svg');
+      const svgXml = new XMLSerializer().serializeToString(svgElement);
+      const svgBlob = new Blob([svgXml], { type: 'image/svg+xml;charset=utf-8' });
+      const URL = window.URL || window.webkitURL || window;
+      const blobURL = URL.createObjectURL(svgBlob);
+
+      const img = new Image();
+      img.onload = () => {
+        exportCtx.drawImage(img, 0, 0, 1000, 760);
+        exportCtx.drawImage(this.dom.drawCanvas, 0, 0, 1000, 760);
+        URL.revokeObjectURL(blobURL);
+        finishDownload();
+      };
+      img.src = blobURL;
+      return;
+    }
+
+    if (this.currentMode === 'blackboard') {
+      // Fill dark slate background
+      exportCtx.fillStyle = '#1A232A';
+      exportCtx.fillRect(0, 0, 1000, 760);
+      exportCtx.drawImage(this.dom.drawCanvas, 0, 0, 1000, 760);
+      finishDownload();
+      return;
+    }
+
+    if (this.currentMode === 'whiteboard') {
+      // Fill crisp white background
+      exportCtx.fillStyle = '#FFFFFF';
+      exportCtx.fillRect(0, 0, 1000, 760);
+      exportCtx.drawImage(this.dom.drawCanvas, 0, 0, 1000, 760);
+      finishDownload();
+      return;
+    }
+
+    // Colouring mode: SVG + freehand drawing canvas
     exportCtx.fillStyle = '#FFFFFF';
     exportCtx.fillRect(0, 0, 1000, 760);
 
     const svgElement = this.dom.artContainer.querySelector('svg');
+    if (!svgElement) {
+      finishDownload();
+      return;
+    }
+
     const svgXml = new XMLSerializer().serializeToString(svgElement);
     const svgBlob = new Blob([svgXml], { type: 'image/svg+xml;charset=utf-8' });
     const URL = window.URL || window.webkitURL || window;
@@ -897,27 +1578,17 @@ class ColouringApp {
     const img = new Image();
     img.onload = () => {
       exportCtx.drawImage(img, 0, 0, 1000, 760);
-      // Layer freehand drawing & stickers canvas on top
       exportCtx.drawImage(this.dom.drawCanvas, 0, 0, 1000, 760);
       URL.revokeObjectURL(blobURL);
-
-      // Trigger download
-      const link = document.createElement('a');
-      link.download = `${this.currentPage.id}-by-little-artist.png`;
-      link.href = exportCanvas.toDataURL('image/png');
-      link.click();
+      finishDownload();
     };
     img.src = blobURL;
   }
 
-  handleCelebration() {
-    sound.playCelebration();
-    confetti.burst(180);
-
+  showToast(message) {
     const toast = document.getElementById('celebration-toast');
     if (toast) {
-      const messages = ['🌟 Masterpiece! 🎨', '🎉 Super Artist! ✨', '💖 So Beautiful! 🌈', '🦄 Brilliant Work! 🌸'];
-      toast.textContent = messages[Math.floor(Math.random() * messages.length)];
+      toast.textContent = message;
       toast.classList.add('show');
       setTimeout(() => {
         toast.classList.remove('show');
